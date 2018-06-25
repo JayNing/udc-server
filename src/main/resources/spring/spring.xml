@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	   xmlns:tx="http://www.springframework.org/schema/tx"
+	   xmlns:mvc="http://www.springframework.org/schema/mvc"
+	   xmlns:aop="http://www.springframework.org/schema/aop"
+	   xmlns:mongo="http://www.springframework.org/schema/data/mongo"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+				http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.0.xsd
+				http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
+				http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.0.xsd
+				http://www.springframework.org/schema/data/mongo http://www.springframework.org/schema/data/mongo/spring-mongo-1.10.2.xsd
+				http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.0.xsd">
+
+
+	<aop:aspectj-autoproxy/>
+
+	<!-- 自动扫描业务包  -->
+	<context:component-scan base-package="com.mascot.service" />
+	<context:component-scan base-package="com.mascot.thriftServer" />
+	<context:component-scan base-package="com.mascot.utils.common" />
+
+	<context:property-placeholder location="classpath:/properties/system.properties" />
+	<bean id="springUtils" class="com.mascot.utils.common.SpringBean" />
+
+
+	<!-- 数据源配置 -->
+	<bean id="masterDataSource" class="com.alibaba.druid.pool.DruidDataSource"
+		destroy-method="close">
+		<property name="driverClassName" value="${mysql.master.driver}" />
+		<property name="url" value="${mysql.master.url}" />
+		<property name="username" value="${mysql.master.username}" />
+		<property name="password" value="${mysql.master.password}" />
+		<property name="initialSize" value="${mysql.master.initialSize}" />
+		<property name="maxActive" value="${mysql.master.maxActive}" />
+		<property name="minIdle" value="${mysql.master.minIdle}" />
+		<property name="removeAbandonedTimeout" value="180" />
+		<property name="removeAbandoned" value="true" />
+		<property name="logAbandoned" value="true" />
+		<property name="testOnBorrow" value="true" />
+		<property name="validationQuery" value="SELECT 1 FROM DUAL" />
+	</bean>
+	<bean id="slave01DataSource" class="com.alibaba.druid.pool.DruidDataSource"
+		  destroy-method="close">
+		<property name="driverClassName" value="${mysql.slave01.driver}" />
+		<property name="url" value="${mysql.slave01.url}" />
+		<property name="username" value="${mysql.slave01.username}" />
+		<property name="password" value="${mysql.slave01.password}" />
+		<property name="initialSize" value="${mysql.slave01.initialSize}" />
+		<property name="maxActive" value="${mysql.slave01.maxActive}" />
+		<property name="minIdle" value="${mysql.slave01.minIdle}" />
+		<property name="removeAbandonedTimeout" value="180" />
+		<property name="removeAbandoned" value="true" />
+		<property name="logAbandoned" value="true" />
+		<property name="testOnBorrow" value="true" />
+		<property name="validationQuery" value="SELECT 1 FROM DUAL" />
+	</bean>
+
+	<!-- 定义数据源，使用自己实现的数据源 -->
+	<bean id="dataSource" class="com.mascot.utils.common.DynamicDataSource">
+		<!-- 设置多个数据源 -->
+		<property name="targetDataSources">
+			<map key-type="java.lang.String">
+				<!-- 这个key需要和程序中的key一致 -->
+				<entry key="master" value-ref="masterDataSource"/>
+				<entry key="slave" value-ref="slave01DataSource"/>
+			</map>
+		</property>
+		<!-- 设置默认的数据源，这里默认走写库 -->
+		<property name="defaultTargetDataSource" ref="masterDataSource"/>
+	</bean>
+
+	<!-- 配置事务 -->
+	<bean id="txManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+	<!-- 定义事务策略 -->
+	<tx:advice id="txAdvice" transaction-manager="txManager">
+		<tx:attributes>
+			<!--定义查询方法都是只读的 -->
+			<tx:method name="query*" read-only="true" />
+			<tx:method name="find*" read-only="true" />
+			<tx:method name="get*" read-only="true" />
+
+			<!-- 主库执行操作，事务传播行为定义为默认行为 -->
+			<tx:method name="add*" propagation="REQUIRED" />
+			<tx:method name="save*" propagation="REQUIRED" />
+			<tx:method name="update*" propagation="REQUIRED" />
+			<tx:method name="delete*" propagation="REQUIRED" />
+			<tx:method name="show*" propagation="REQUIRED" />
+
+			<!--其他方法使用默认事务策略 -->
+			<tx:method name="*" />
+		</tx:attributes>
+	</tx:advice>
+
+	<!-- 定义AOP切面处理器 -->
+	<bean class="com.mascot.utils.common.DataSourceAspect" id="dataSourceAspect">
+		<!-- 指定事务策略 -->
+		<property name="txAdvice" ref="txAdvice"/>
+		<!-- 指定slave方法的前缀（非必须） -->
+		<property name="slaveMethodStart" value="query,find,get"/>
+	</bean>
+
+	<aop:config>
+		<!-- 定义切面，所有的service的所有方法 -->
+		<aop:pointcut id="txPointcut" expression="execution(* com.mascot.service.impl.*.*(..))" />
+		<!-- 应用事务策略到Service切面 -->
+		<aop:advisor advice-ref="txAdvice" pointcut-ref="txPointcut"/>
+
+		<!-- 将切面应用到自定义的切面处理器上，-9999保证该切面优先级最高执行 -->
+		<aop:aspect ref="dataSourceAspect" order="-9999">
+			<aop:before method="before" pointcut-ref="txPointcut" />
+		</aop:aspect>
+	</aop:config>
+
+
+	<bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+
+	<!-- mongo -->
+	<mongo:db-factory id="mongoDbFactory" host="${mongo.host}" port="${mongo.port}" dbname="${mongo.dbname}"/>
+	<bean id="secondaryPreferredReadPreference" class="com.mongodb.TaggableReadPreference.SecondaryPreferredReadPreference" />
+
+	<bean id="mongoOperations" class="org.springframework.data.mongodb.core.MongoTemplate">
+		<constructor-arg name="mongoDbFactory" ref="mongoDbFactory" />
+		<property name="readPreference" ref="secondaryPreferredReadPreference"/>
+	</bean>
+	<bean id="mongoTemplate" class="org.springframework.data.mongodb.core.MongoTemplate">
+		<constructor-arg name="mongoDbFactory" ref="mongoDbFactory" />
+	</bean>
+
+
+	<!--<bean class="com.yjt.utils.common.Test"/>-->
+	<import resource="spring-dubbo.xml"/>
+
+</beans>

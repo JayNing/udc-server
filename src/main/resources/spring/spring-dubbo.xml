@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:dubbo="http://code.alibabatech.com/schema/dubbo"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+
+         http://code.alibabatech.com/schema/dubbo http://code.alibabatech.com/schema/dubbo/dubbo.xsd  ">
+
+    <dubbo:application name="mascot-server-dubbo"/>
+    <dubbo:registry address="zookeeper://10.128.5.97:2181" username="jerry" password="udcjerry"/>
+    <dubbo:protocol name="dubbo" port="20882" host="192.168.0.143"/>
+    <dubbo:service interface="com.interfaces.mascot.AuthorityManager" ref="authorityManager"/>
+
+    <!--消息管理-->
+    <dubbo:service interface="com.interfaces.mascot.MessageManageService" ref="messageManageService"/>
+    <!--权限管理-->
+    <dubbo:service interface="com.interfaces.mascot.RoleManageService" ref="roleManageService"/>
+    <!--图书管理-->
+    <dubbo:service interface="com.interfaces.mascot.BookManageService" ref="bookManageService"/>
+    <!--模块管理-->
+    <dubbo:service interface="com.interfaces.mascot.ModuleManageService" ref="moduleManageService"/>
+    <!--账号管理-->
+    <dubbo:service interface="com.interfaces.mascot.UserManageService" ref="userManageService"/>
+    <!--专家管理-->
+    <dubbo:service interface="com.interfaces.mascot.SpecialistManageService" ref="specialistManageService"/>
+    <!--知识管理-->
+    <dubbo:service interface="com.interfaces.mascot.KnowledgeManageService" ref="knowledgeManageService"/>
+    <!--社区管理-->
+    <dubbo:service interface="com.interfaces.mascot.BbsManageService" ref="bbsManageService"/>
+    <!--考试管理-->
+    <dubbo:service interface="com.interfaces.mascot.ExamManageService" ref="examManageService"/>
+    <!--培训管理-->
+    <dubbo:service interface="com.interfaces.mascot.TrainManageService" ref="trainManageService"/>
+
+    <!--分类管理：1.部门分类；2.知识仓库文章分类；3.知识仓库流程分类；4.社区贴子分类；5.考试培训分类；-->
+    <!--部门分类管理-->
+    <dubbo:service interface="com.interfaces.mascot.DepartmentManageService" ref="departmentManageService"/>
+    <!--知识仓库文章分类-->
+    <dubbo:service interface="com.interfaces.mascot.RepositoryCategoryService" ref="repositoryCategoryService"/>
+    <!--知识仓库流程分类-->
+    <dubbo:service interface="com.interfaces.mascot.RepositoryCategoryFlowService" ref="repositoryCategoryFlowService"/>
+    <!--社区贴子分类-->
+    <dubbo:service interface="com.interfaces.mascot.EssayTypeService" ref="essayTypeService"/>
+    <!--考试培训分类-->
+    <dubbo:service interface="com.interfaces.mascot.ExCategoryService" ref="exCategoryService"/>
+
+
+    <!-- consumer -->
+    <dubbo:reference id="userInfoService" check="true" interface="com.interfaces.usercenter.UserInfoService"
+                     init="true"/>
+    <dubbo:reference id="fileBasicService" check="true" interface="com.interfaces.file.BasicService" init="true"/>
+
+
+</beans>
